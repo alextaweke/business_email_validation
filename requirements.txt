@@ -1,0 +1,6 @@
+Django==5.2.7
+djangorestframework==3.16.1
+dnspython==2.8.0
+email-validator==2.3.0
+drf-spectacular==0.28.0
+python-dotenv==1.1.1
