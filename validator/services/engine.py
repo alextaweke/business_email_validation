@@ -13,10 +13,12 @@ import dns.resolver
 
 logger = logging.getLogger("validator")
 
+
 def _cache_key(normalized: str, check_smtp: bool) -> str:
     # Do not place raw email addresses in cache keys.
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
     return f"email-validation:v1:{digest}:{int(check_smtp)}"
+
 
 def _base(result, reason, syntax_valid, mail_route, smtp_checked, duration, request_id):
     return {
@@ -31,14 +33,22 @@ def _base(result, reason, syntax_valid, mail_route, smtp_checked, duration, requ
         "request_id": request_id,
     }
 
+
 def validate_email_address(email: str, check_smtp: bool = False) -> dict:
     started = time.monotonic()
     request_id = str(uuid.uuid4())
     valid, normalized, syntax_reason = normalize_and_validate(email)
 
     if not valid:
-        return _base("false", syntax_reason, False, None, False,
-                     time.monotonic() - started, request_id)
+        return _base(
+            "false",
+            syntax_reason,
+            False,
+            None,
+            False,
+            time.monotonic() - started,
+            request_id,
+        )
 
     local, domain = normalized.rsplit("@", 1)
     # Domain is normalized lowercase/IDNA by email-validator.
@@ -54,16 +64,42 @@ def validate_email_address(email: str, check_smtp: bool = False) -> dict:
     try:
         has_route, dns_reason = check_mail_route(domain)
     except DNSCheckError as exc:
-        output = _base("not_known", exc.reason_code, True, None, False,
-                       time.monotonic() - started, request_id)
+        output = _base(
+            "not_known",
+            exc.reason_code,
+            True,
+            None,
+            False,
+            time.monotonic() - started,
+            request_id,
+        )
         cache.set(cache_key, output, settings.CACHE_TTL_UNKNOWN)
         return output
 
     if not has_route:
-        result = "false" if dns_reason in {"DOMAIN_NOT_FOUND", "NO_MAIL_ROUTE"} else "not_known"
-        output = _base(result, dns_reason, True, False, False,
-                       time.monotonic() - started, request_id)
-        cache.set(cache_key, output, settings.CACHE_TTL_FALSE if result == "false" else settings.CACHE_TTL_UNKNOWN)
+        result = (
+            "false"
+            if dns_reason in {"DOMAIN_NOT_FOUND", "NO_MAIL_ROUTE"}
+            else "not_known"
+        )
+        output = _base(
+            result,
+            dns_reason,
+            True,
+            False,
+            False,
+            time.monotonic() - started,
+            request_id,
+        )
+        cache.set(
+            cache_key,
+            output,
+            (
+                settings.CACHE_TTL_FALSE
+                if result == "false"
+                else settings.CACHE_TTL_UNKNOWN
+            ),
+        )
         return output
 
     result, reason, smtp_checked = "not_known", "SMTP_NOT_REQUESTED", False
@@ -85,27 +121,33 @@ def validate_email_address(email: str, check_smtp: bool = False) -> dict:
                             resolver.timeout = settings.DNS_TIMEOUT_SECONDS
                             resolver.lifetime = settings.DNS_LIFETIME_SECONDS
                             mx_records = resolver.resolve(domain, "MX")
-                            mx_host = sorted(mx_records, key=lambda item: item.preference)[0].exchange.to_text(omit_final_dot=True)
+                            mx_host = sorted(
+                                mx_records, key=lambda item: item.preference
+                            )[0].exchange.to_text(omit_final_dot=True)
                         result, reason = verify_recipient(mx_host, normalized)
                         smtp_checked = True
                     except Exception:
                         result, reason = "not_known", "SMTP_UNAVAILABLE"
                 record_smtp_failure(domain, reason)
 
-    output = _base(result, reason, True, True, smtp_checked,
-                   time.monotonic() - started, request_id)
+    output = _base(
+        result, reason, True, True, smtp_checked, time.monotonic() - started, request_id
+    )
     ttl = settings.CACHE_TTL_UNKNOWN
     if result == "false":
         ttl = settings.CACHE_TTL_FALSE
     elif result == "true":
         ttl = settings.CACHE_TTL_TRUE
     cache.set(cache_key, output, ttl)
-    logger.info("email_validation_completed", extra={
-        "request_id": request_id,
-        "domain": domain,
-        "result": result,
-        "reason_code": reason,
-        "smtp_checked": smtp_checked,
-        "duration_ms": output["duration_ms"],
-    })
+    logger.info(
+        "email_validation_completed",
+        extra={
+            "request_id": request_id,
+            "domain": domain,
+            "result": result,
+            "reason_code": reason,
+            "smtp_checked": smtp_checked,
+            "duration_ms": output["duration_ms"],
+        },
+    )
     return output

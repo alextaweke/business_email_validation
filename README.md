@@ -48,7 +48,7 @@ API runs at `http://127.0.0.1:8000`. Swagger UI: `http://127.0.0.1:8000/api/docs
 
 ```powershell
 $headers = @{ "X-API-Key" = "replace-this-api-key" }
-$body = @{ email = "person@example.com"; check_smtp = $false } | ConvertTo-Json
+$body = @{ email = "person@example.com"; check_smtp = $true } | ConvertTo-Json
 Invoke-RestMethod -Method Post `
   -Uri "http://127.0.0.1:8000/api/v1/email/validate/" `
   -Headers $headers -ContentType "application/json" -Body $body
@@ -60,8 +60,13 @@ Equivalent curl:
 curl -X POST http://127.0.0.1:8000/api/v1/email/validate/ \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: replace-this-api-key" \\
-  -d '{"email":"person@example.com","check_smtp":false}'
+  -d '{"email":"person@example.com","check_smtp":true}'
 ```
+
+To see `result: "true"`, SMTP checks must be enabled and the request must set
+`check_smtp` to `true`. The target domain must also allow the SMTP recipient
+check and explicitly accept the recipient. Consumer providers such as Gmail,
+Outlook, Yahoo, and iCloud are skipped by policy and return `not_known`.
 
 ## Response contract
 

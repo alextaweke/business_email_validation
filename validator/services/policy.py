@@ -15,6 +15,7 @@ def smtp_allowed(domain: str) -> tuple[bool, str]:
     if not settings.GLOBAL_SMTP_ENABLED or not settings.SMTP_CHECKS_ENABLED:
         return False, "SMTP_SKIPPED_BY_POLICY"
     from .smtp_checks import provider_policy_allows_smtp
+
     if not provider_policy_allows_smtp(domain):
         return False, "SMTP_SKIPPED_BY_POLICY"
     if cache.get(f"smtp-cooldown:{domain}"):
@@ -47,7 +48,10 @@ def smtp_probe_slot(domain: str):
 def record_smtp_failure(domain: str, reason_code: str) -> None:
     """Short domain cooldown for transient/unavailable SMTP outcomes."""
     if reason_code in {
-        "SMTP_TEMPORARY_FAILURE", "SMTP_TIMEOUT", "SMTP_UNAVAILABLE",
-        "SMTP_AMBIGUOUS", "SMTP_RATE_LIMITED",
+        "SMTP_TEMPORARY_FAILURE",
+        "SMTP_TIMEOUT",
+        "SMTP_UNAVAILABLE",
+        "SMTP_AMBIGUOUS",
+        "SMTP_RATE_LIMITED",
     }:
         cache.set(f"smtp-cooldown:{domain}", True, timeout=300)

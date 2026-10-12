@@ -5,12 +5,23 @@ from django.conf import settings
 # SMTP recipient probing is skipped for major consumer providers because their
 # responses are often deliberately ambiguous and probing may violate provider policy.
 CONSUMER_PROVIDERS = {
-    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
-    "yahoo.com", "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com",
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "yahoo.com",
+    "icloud.com",
+    "me.com",
+    "aol.com",
+    "proton.me",
+    "protonmail.com",
 }
+
 
 def provider_policy_allows_smtp(domain: str) -> bool:
     return domain.lower() not in CONSUMER_PROVIDERS
+
 
 def verify_recipient(mx_host: str, email: str) -> tuple[str, str]:
     """
@@ -30,15 +41,25 @@ def verify_recipient(mx_host: str, email: str) -> tuple[str, str]:
         if code >= 400:
             return "not_known", "SMTP_AMBIGUOUS"
         code, response = smtp.rcpt(email)
-        message = response.decode("utf-8", "replace") if isinstance(response, bytes) else str(response)
+        message = (
+            response.decode("utf-8", "replace")
+            if isinstance(response, bytes)
+            else str(response)
+        )
         lower = message.lower()
 
         if 200 <= code < 300:
             return "true", "SMTP_RECIPIENT_ACCEPTED"
-        if code == 550 and any(term in lower for term in (
-            "user unknown", "no such user", "mailbox does not exist",
-            "recipient address rejected", "unknown recipient",
-        )):
+        if code == 550 and any(
+            term in lower
+            for term in (
+                "user unknown",
+                "no such user",
+                "mailbox does not exist",
+                "recipient address rejected",
+                "unknown recipient",
+            )
+        ):
             return "false", "SMTP_RECIPIENT_REJECTED"
         if 400 <= code < 500:
             return "not_known", "SMTP_TEMPORARY_FAILURE"
