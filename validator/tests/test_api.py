@@ -1,4 +1,6 @@
 from unittest.mock import patch
+import dns.exception
+from validator.services.dns_checks import DNSCheckError
 from django.test import override_settings
 from rest_framework.test import APITestCase
 from django.core.cache import cache
@@ -59,6 +61,36 @@ class EmailValidationAPITests(APITestCase):
         self.assertEqual(response.data["result"], "false")
         self.assertEqual(response.data["reason_code"], "DOMAIN_NOT_FOUND")
 
+    @patch("validator.services.engine.check_mail_route")
+    def test_temporary_dns_failure_maps_not_known(self, mocked_dns):
+        mocked_dns.side_effect = DNSCheckError("DNS_TEMPORARY_FAILURE")
+
+        response = self.client.post(
+            self.url,
+            {"email": "person@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["result"], "not_known")
+        self.assertEqual(response.data["reason_code"], "DNS_TEMPORARY_FAILURE")
+        self.assertIsNone(response.data["domain_has_mail_route"])
+
+    @patch(
+        "validator.views.validate_email_address",
+        side_effect=RuntimeError("unexpected failure"),
+    )
+    def test_unexpected_failure_has_safe_response_with_request_id(self, mocked_validate):
+        response = self.client.post(
+            self.url,
+            {"email": "person@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.data["detail"], "Validation service temporarily failed.")
+        self.assertIsNotNone(response.data["request_id"])
+
     @override_settings(SMTP_CHECKS_ENABLED=True, GLOBAL_SMTP_ENABLED=True)
     @patch("validator.services.engine.verify_recipient")
     @patch("validator.services.engine.smtp_allowed", return_value=(True, "SMTP_POLICY_ALLOWED"))
@@ -80,3 +112,26 @@ class EmailValidationAPITests(APITestCase):
         self.assertEqual(response.data["reason_code"], "SMTP_RECIPIENT_ACCEPTED")
         self.assertTrue(response.data["smtp_checked"])
         mocked_smtp.assert_called_once_with("example.com", "person@example.com")
+
+    @override_settings(SMTP_CHECKS_ENABLED=True, GLOBAL_SMTP_ENABLED=True)
+    @patch("validator.services.engine.dns.resolver.Resolver")
+    @patch("validator.services.engine.smtp_allowed", return_value=(True, "SMTP_POLICY_ALLOWED"))
+    @patch(
+        "validator.services.engine.check_mail_route",
+        return_value=(True, "MX_RECORD_FOUND"),
+    )
+    def test_smtp_mx_lookup_failure_has_reason(
+        self, mocked_dns_route, mocked_policy, resolver_class
+    ):
+        resolver_class.return_value.resolve.side_effect = dns.exception.Timeout()
+
+        response = self.client.post(
+            self.url,
+            {"email": "person@example.com", "check_smtp": True},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["result"], "not_known")
+        self.assertEqual(response.data["reason_code"], "DNS_TEMPORARY_FAILURE")
+        self.assertFalse(response.data["smtp_checked"])

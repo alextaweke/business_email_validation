@@ -37,7 +37,7 @@ def verify_recipient(mx_host: str, email: str) -> tuple[str, str]:
         code, _ = smtp.ehlo(settings.SMTP_HELO_NAME)
         if code >= 400:
             return "not_known", "SMTP_AMBIGUOUS"
-        code, _ = smtp.mail("validator@" + settings.SMTP_HELO_NAME)
+        code, _ = smtp.mail(settings.SMTP_MAIL_FROM)
         if code >= 400:
             return "not_known", "SMTP_AMBIGUOUS"
         code, response = smtp.rcpt(email)

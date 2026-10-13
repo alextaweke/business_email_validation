@@ -1,4 +1,5 @@
 import logging
+import uuid
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -29,10 +30,11 @@ class EmailValidateView(APIView):
             result = validate_email_address(data["email"], data["check_smtp"])
             return Response(result, status=status.HTTP_200_OK)
         except Exception:
+            request_id = str(uuid.uuid4())
             logger.exception("Unexpected validation failure")
             return Response({
                 "detail": "Validation service temporarily failed.",
-                "request_id": None,
+                "request_id": request_id,
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["GET"])

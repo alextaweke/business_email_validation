@@ -54,4 +54,8 @@ def record_smtp_failure(domain: str, reason_code: str) -> None:
         "SMTP_AMBIGUOUS",
         "SMTP_RATE_LIMITED",
     }:
-        cache.set(f"smtp-cooldown:{domain}", True, timeout=300)
+        cache.set(
+            f"smtp-cooldown:{domain}",
+            True,
+            timeout=settings.SMTP_DOMAIN_COOLDOWN_SECONDS,
+        )

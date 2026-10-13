@@ -9,6 +9,7 @@ from .syntax import normalize_and_validate
 from .dns_checks import check_mail_route, DNSCheckError
 from .policy import smtp_allowed, record_smtp_failure, smtp_probe_slot
 from .smtp_checks import verify_recipient
+import dns.exception
 import dns.resolver
 
 logger = logging.getLogger("validator")
@@ -126,6 +127,8 @@ def validate_email_address(email: str, check_smtp: bool = False) -> dict:
                             )[0].exchange.to_text(omit_final_dot=True)
                         result, reason = verify_recipient(mx_host, normalized)
                         smtp_checked = True
+                    except dns.exception.DNSException:
+                        result, reason = "not_known", "DNS_TEMPORARY_FAILURE"
                     except Exception:
                         result, reason = "not_known", "SMTP_UNAVAILABLE"
                 record_smtp_failure(domain, reason)

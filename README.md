@@ -104,6 +104,8 @@ A `200` means the validation workflow completed; it does not mean the email addr
 | `DNS_LIFETIME_SECONDS` | DNS overall timeout | `4` |
 | `SMTP_GLOBAL_CONCURRENCY_LIMIT` | In-process outbound SMTP concurrency cap | `5` |
 | `SMTP_DOMAIN_CONCURRENCY_LIMIT` | In-process per-domain SMTP concurrency cap | `1` |
+| `SMTP_HELO_NAME` | Hostname sent in SMTP EHLO/HELO | `email-validator.example.invalid` |
+| `SMTP_MAIL_FROM` | Envelope sender used for SMTP `MAIL FROM`; blank sends a null reverse-path | blank |
 | `API_RATE_LIMIT` | Per-client request limit | `30/min` |
 | `CACHE_TTL_TRUE` | Cache TTL for true | `900` |
 | `CACHE_TTL_FALSE` | Cache TTL for false | `3600` |
@@ -126,6 +128,8 @@ Tests mock DNS and SMTP for core service scenarios. No live external SMTP probes
 5. If enabled, make one bounded attempt to one MX host. Do not send `DATA`, guess recipient variants, retry repeatedly, rotate IPs, use proxies, or evade throttling.
 6. Treat SMTP recipient acceptance as best-effort evidence for `true`, and treat only clearly identified permanent recipient rejection as evidence for `false`. Temporary and ambiguous outcomes are `not_known`.
 7. Cache outcomes with short TTL for uncertain results and log only domain/result/reason/duration/correlation ID.
+
+For live SMTP checks, set `SMTP_HELO_NAME` to a stable hostname for the machine or service. Leave `SMTP_MAIL_FROM` blank to use the SMTP null reverse-path, or set it to a monitored sender address on a domain you control. An invalid sender domain can cause the remote server to reject `MAIL FROM` before the recipient is checked, which correctly returns `not_known` instead of `true`.
 
 ### Production hardening recommendations
 

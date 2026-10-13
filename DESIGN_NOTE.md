@@ -8,7 +8,7 @@
 4. Check the cache using a SHA-256 digest of the normalized address (the raw address is not put into the cache key).
 5. Resolve MX. If there is no MX answer, check A/AAAA fallback. Map NXDOMAIN to `DOMAIN_NOT_FOUND`, missing route to `NO_MAIL_ROUTE`, and temporary DNS errors to `DNS_TEMPORARY_FAILURE`.
 6. If SMTP is not requested, disabled globally, disallowed by provider policy, or the domain is cooling down, return `not_known`.
-7. If allowed, connect to one MX host with a strict timeout, issue EHLO/MAIL/RCPT, never DATA, and close the session.
+7. If allowed, connect to one MX host with a strict timeout, issue EHLO/MAIL/RCPT using configured SMTP identity settings, never DATA, and close the session.
 8. SMTP recipient acceptance maps to best-effort `true` per the interview contract. Only a clearly identified permanent nonexistent-recipient rejection maps to `false`; catch-all suspicion, provider blocks, temporary failures, and ambiguity map to `not_known`.
 9. Cache with short TTL for uncertain outcomes, and log a request ID, domain, reason, duration, and result without the full email address.
 
@@ -18,6 +18,7 @@
 - Major consumer providers are excluded from recipient probing.
 - No guessed addresses, message bodies, proxy/IP rotation, or repeated retries.
 - SMTP attempts are bounded by a timeout and a short cooldown after transient failures.
+- The SMTP envelope sender is configurable; the default blank value uses a null reverse-path so a fake sender domain does not prevent recipient acceptance from being observed.
 - Caller throttling is enabled. The MVP's in-process cache is not a distributed lock; production should use Redis and shared concurrency limits.
 - API responses do not expose raw SMTP transcripts, internal host details, or stack traces.
 
